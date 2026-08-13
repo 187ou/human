@@ -1,4 +1,4 @@
-"""出行API"""
+"""出行处理API（含开销预估、行李清单、日程联动、天气提醒）"""
 from datetime import datetime
 
 from fastapi import APIRouter, Depends
@@ -7,11 +7,10 @@ from sqlalchemy import select, and_
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.schedules import _parse_dt
-
 from app.api.deps import get_session, get_current_user
-from app.models.travel import TravelPlan
 from app.models.user import User
-from app.services.behavior_collector import BehaviorCollector
+from app.models.travel import TravelPlan
+from app.services.travel_planner import TravelPlanner
 
 router = APIRouter()
 
@@ -21,8 +20,9 @@ class TravelCreate(BaseModel):
     travel_type: str = "trip"
     origin: str | None = None
     destination: str | None = None
-    depart_time: datetime | None = None
+    depart_time: datetime
     arrive_time: datetime | None = None
+    notes: str | None = None
 
     @field_validator("depart_time", "arrive_time", mode="before")
     @classmethod
@@ -30,10 +30,9 @@ class TravelCreate(BaseModel):
         if v is None or v == "":
             return None
         return _parse_dt(v)
-    ticket_no: str | None = None
-    carrier: str | None = None
-    notes: str | None = None
 
+
+# ==================== CRUD ====================
 
 @router.post("")
 async def create_travel(
@@ -41,40 +40,31 @@ async def create_travel(
     session: AsyncSession = Depends(get_session),
     user: User = Depends(get_current_user),
 ):
-    plan = TravelPlan(
-        user_id=user.id,
-        title=data.title,
-        travel_type=data.travel_type,
-        origin=data.origin,
-        destination=data.destination,
-        depart_time=data.depart_time,
-        arrive_time=data.arrive_time,
-        ticket_no=data.ticket_no,
-        carrier=data.carrier,
-        notes=data.notes,
+    """创建出行计划（含开销预估、行李清单、日程联动）"""
+    planner = TravelPlanner(session, user.id)
+    result = await planner.create_travel_plan(
+        title=data.title, travel_type=data.travel_type,
+        destination=data.destination, depart_time=data.depart_time,
+        arrive_time=data.arrive_time, origin=data.origin, notes=data.notes,
     )
-    session.add(plan)
     await session.commit()
-    return {"code": 0, "data": {"id": plan.id}}
+    return {"code": 0, "data": result}
 
 
 @router.get("")
 async def list_travels(
-    upcoming: bool = True,
     session: AsyncSession = Depends(get_session),
     user: User = Depends(get_current_user),
 ):
-    stmt = select(TravelPlan).where(TravelPlan.user_id == user.id)
-    if upcoming:
-        stmt = stmt.where(
-            and_(TravelPlan.depart_time >= datetime.utcnow(), TravelPlan.is_completed == False)
-        )
-    result = await session.execute(stmt.order_by(TravelPlan.depart_time))
+    stmt = select(TravelPlan).where(TravelPlan.user_id == user.id).order_by(TravelPlan.depart_time)
+    result = await session.execute(stmt)
     items = result.scalars().all()
     return {"code": 0, "data": [
-        {"id": t.id, "title": t.title, "type": t.travel_type, "destination": t.destination,
-         "depart": t.depart_time.isoformat() if t.depart_time else None,
-         "weather_risk": t.weather_risk}
+        {"id": t.id, "title": t.title, "type": t.travel_type,
+         "destination": t.destination, "depart": t.depart_time.isoformat() if t.depart_time else None,
+         "arrive": t.arrive_time.isoformat() if t.arrive_time else None,
+         "estimated_cost": t.estimated_total_cost, "weather_risk": t.weather_risk,
+         "is_completed": t.is_completed}
         for t in items
     ]}
 
@@ -86,15 +76,52 @@ async def complete_travel(
     session: AsyncSession = Depends(get_session),
     user: User = Depends(get_current_user),
 ):
-    stmt = select(TravelPlan).where(and_(TravelPlan.id == travel_id, TravelPlan.user_id == user.id))
-    result = await session.execute(stmt)
-    plan = result.scalar_one_or_none()
-    if not plan:
-        from fastapi import HTTPException
-        raise HTTPException(status_code=404, detail="出行计划不存在")
+    """完成出行"""
+    plan = await session.get(TravelPlan, travel_id)
+    if not plan or plan.user_id != user.id:
+        return {"code": 1, "message": "出行计划不存在"}
     plan.is_completed = True
-    collector = BehaviorCollector(session)
-    await collector.log_travel(user_id=user.id, travel_id=travel_id, is_on_time=is_on_time)
-
     await session.commit()
     return {"code": 0}
+
+
+# ==================== 功能接口 ====================
+
+@router.get("/estimate-cost")
+async def estimate_cost(
+    travel_type: str = "trip",
+    destination: str | None = None,
+    days: int = 1,
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+):
+    """预估开销"""
+    planner = TravelPlanner(session, user.id)
+    costs = await planner.estimate_costs(travel_type, destination, days)
+    return {"code": 0, "data": costs}
+
+
+@router.get("/packing-list")
+async def packing_list(
+    days: int = 1,
+    weather: str | None = None,
+    temp: float | None = None,
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+):
+    """生成行李清单"""
+    planner = TravelPlanner(session, user.id)
+    packing = await planner.generate_packing_list(days, weather, temp)
+    return {"code": 0, "data": packing}
+
+
+@router.get("/weather-check")
+async def weather_check(
+    destination: str | None = None,
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+):
+    """天气检查"""
+    planner = TravelPlanner(session, user.id)
+    weather = await planner.check_weather_risk(destination)
+    return {"code": 0, "data": weather}
