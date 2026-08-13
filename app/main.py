@@ -1,11 +1,14 @@
 """FastAPI应用入口"""
+import os
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from loguru import logger
-import os
+
+# 初始化LangSmith追踪（必须在其他导入前）
+from app.utils.langsmith_config import LANGSMITH_TRACING
 
 from app.config import settings
 from app.db import close_db, init_db
