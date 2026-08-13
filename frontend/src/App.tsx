@@ -5,7 +5,7 @@ import ModulePage from './pages/ModulePage'
 import EvolutionPage from './pages/EvolutionPage'
 import ScenePage from './pages/ScenePage'
 import { api, getToken, setToken } from './api/client'
-import './styles/design-system.css'
+import './styles/global.css'
 
 const modules = [
   { id: 'dashboard', name: '概览', icon: '◈' },
@@ -26,24 +26,12 @@ export default function App() {
 
   useEffect(() => {
     if (getToken()) {
-      api('/auth/me').then(d => {
-        setUser(d.data)
-        setLoading(false)
-      }).catch(() => {
-        loadRoles()
-      })
-    } else {
-      loadRoles()
-    }
+      api('/auth/me').then(d => { setUser(d.data); setLoading(false) }).catch(() => loadRoles())
+    } else { loadRoles() }
   }, [])
 
   async function loadRoles() {
-    try {
-      const data = await api('/auth/roles')
-      setRoles(data.data)
-    } catch {
-      setRoles([])
-    }
+    try { const data = await api('/auth/roles'); setRoles(data.data) } catch { setRoles([]) }
     setLoading(false)
   }
 
@@ -53,20 +41,20 @@ export default function App() {
     setUser(data.data.user)
   }
 
-  if (loading) return <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', color: '#94a3b8' }}>加载中...</div>
+  if (loading) return <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', color: 'var(--text-muted)' }}>加载中...</div>
 
   if (!user) {
     return (
       <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative', zIndex: 1 }}>
-        <div style={{ width: 480, textAlign: 'center' }}>
+        <div className="glass anim-scale-in" style={{ width: 420, padding: 48, textAlign: 'center' }}>
           <div style={{ fontSize: 48, marginBottom: 16 }}>🧠</div>
-          <h1 style={{ fontSize: 28, fontWeight: 700, marginBottom: 8 }}>HumanAgent</h1>
-          <p style={{ color: '#94a3b8', marginBottom: 32 }}>选择一个角色开始使用</p>
-          <div style={{ display: 'grid', gap: 12 }}>
+          <h1 style={{ fontSize: 24, fontWeight: 700, marginBottom: 8 }}>HumanAgent</h1>
+          <p style={{ color: 'var(--text-secondary)', marginBottom: 28, fontSize: 14 }}>选择一个角色开始使用</p>
+          <div style={{ display: 'grid', gap: 10 }}>
             {roles.map(r => (
-              <button key={r.id} onClick={() => selectRole(r.id)} className="glass-card" style={{ cursor: 'pointer', width: '100%', textAlign: 'left' }}>
-                <span style={{ fontWeight: 600 }}>{r.username}</span>
-                <span style={{ color: '#94a3b8', fontSize: 13, marginLeft: 12 }}>{r.user_type}</span>
+              <button key={r.id} onClick={() => selectRole(r.id)} className="list-item" style={{ cursor: 'pointer', marginBottom: 0 }}>
+                <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{r.username}</span>
+                <span className="tag">{r.user_type}</span>
               </button>
             ))}
           </div>
@@ -85,8 +73,8 @@ export default function App() {
   return (
     <div style={{ display: 'flex', minHeight: '100vh', position: 'relative', zIndex: 1 }}>
       <Sidebar modules={modules} active={active} onSelect={setActive} user={user} />
-      <main style={{ flex: 1, marginLeft: 240, padding: '32px 40px' }}>
-        <div className="animate-fade-in" key={active}>
+      <main className="main-content" style={{ flex: 1, marginLeft: 'var(--sidebar-w)', padding: 'var(--sp-8)', transition: 'margin var(--dur-normal) var(--ease)' }}>
+        <div className="anim-fade-up" key={active}>
           {renderPage()}
         </div>
       </main>
