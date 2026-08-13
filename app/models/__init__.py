@@ -1,6 +1,6 @@
 from app.models.user import User
 from app.models.schedule import Schedule, ScheduleItem, RecurringException
-from app.models.consume import ConsumeRecord, Budget
+from app.models.consume import ConsumeRecord, Budget, BudgetTransfer, MonthlyReview, BudgetAlert
 from app.models.item import Item
 from app.models.study import StudyPlan, StudyRecord
 from app.models.travel import TravelPlan
@@ -9,7 +9,7 @@ from app.models.rule import UserRule
 
 __all__ = [
     "User", "Schedule", "ScheduleItem", "RecurringException",
-    "ConsumeRecord", "Budget",
+    "ConsumeRecord", "Budget", "BudgetTransfer", "MonthlyReview", "BudgetAlert",
     "Item",
     "StudyPlan", "StudyRecord",
     "TravelPlan",
