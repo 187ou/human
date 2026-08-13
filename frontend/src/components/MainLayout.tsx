@@ -10,6 +10,7 @@ const navItems = [
   { path: '/study', label: '📚 学习' },
   { path: '/travel', label: '🚗 出行' },
   { path: '/evolution', label: '🧬 演化' },
+  { path: '/scenarios', label: '🔗 联动' },
 ]
 
 export default function MainLayout() {

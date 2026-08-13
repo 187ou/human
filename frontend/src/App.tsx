@@ -10,6 +10,7 @@ import Item from './pages/Item'
 import Study from './pages/Study'
 import Travel from './pages/Travel'
 import Evolution from './pages/Evolution'
+import Scenarios from './pages/Scenarios'
 
 export default function App() {
   const { user, loading } = useAuth()
@@ -29,6 +30,7 @@ export default function App() {
         <Route path="/study" element={<Study />} />
         <Route path="/travel" element={<Travel />} />
         <Route path="/evolution" element={<Evolution />} />
+        <Route path="/scenarios" element={<Scenarios />} />
       </Route>
     </Routes>
   )
