@@ -1,4 +1,4 @@
-"""规则生命周期管理：诞生→生效→迭代→过期→淘汰"""
+"""规则全生命周期自治管理：诞生→生效→迭代→休眠→过期销毁"""
 from datetime import datetime, timedelta
 from typing import Any
 

@@ -1,89 +1,92 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import { api } from '../api/client'
-import { Line, Doughnut, Bar } from 'react-chartjs-2'
-import {
-  Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement,
-  BarElement, ArcElement, Title, Tooltip, Legend, Filler,
-} from 'chart.js'
-
-ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, BarElement, ArcElement, Title, Tooltip, Legend, Filler)
-
-interface DashboardData {
-  month_consume: number
-  week_study_hours: number
-  upcoming_schedules: number
-  expiring_items: number
-  daily_consume: { day: string; total: number }[]
-  study_subjects: { subject: string; minutes: number }[]
-  consume_categories: { category: string; total: number }[]
-}
 
 export default function Dashboard() {
-  const [data, setData] = useState<DashboardData | null>(null)
+  const [stats, setStats] = useState<any>(null)
 
   useEffect(() => {
-    api('/stats/dashboard').then(d => setData(d.data)).catch(() => {})
+    api('/stats/dashboard').then(d => setStats(d.data)).catch(() => {})
   }, [])
 
-  if (!data) return <div>加载中...</div>
-
-  const statCards = [
-    { icon: '💰', value: `¥${data.month_consume.toFixed(0)}`, label: '本月消费' },
-    { icon: '📚', value: `${data.week_study_hours}h`, label: '本周学习' },
-    { icon: '📅', value: data.upcoming_schedules, label: '待办日程' },
-    { icon: '⏰', value: data.expiring_items, label: '即将过期' },
-  ]
-
-  const chartOptions = { responsive: true, plugins: { legend: { display: false } } }
+  // 使用 useMemo 缓存卡片数据，避免每次渲染重新创建
+  const cards = useMemo(() => [
+    { label: '本月消费', value: `¥${(stats?.month_consume || 0).toFixed(0)}`, color: '#f43f5e', icon: '◉', width: 60 + Math.random() * 30 },
+    { label: '本周学习', value: `${stats?.week_study_hours || 0}h`, color: '#6366f1', icon: '◐', width: 40 + Math.random() * 40 },
+    { label: '待办日程', value: stats?.upcoming_schedules || 0, color: '#f59e0b', icon: '◷', width: 30 + Math.random() * 50 },
+    { label: '即将过期', value: stats?.expiring_items || 0, color: '#10b981', icon: '◑', width: 50 + Math.random() * 30 },
+  ], [stats]) // 只在 stats 变化时重新计算
 
   return (
     <div>
-      <h2 style={{ marginBottom: 20 }}>📊 数据概览</h2>
+      <h1 style={{ fontSize: 28, fontWeight: 700, marginBottom: 8 }}>
+        你好，欢迎回来 ◈
+      </h1>
+      <p style={{ color: '#94a3b8', marginBottom: 32 }}>
+        这是你的生活数据概览，一切尽在掌握。
+      </p>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 15, marginBottom: 20 }}>
-        {statCards.map((c, i) => (
-          <div key={i} className="card" style={{ display: 'flex', alignItems: 'center', gap: 15, marginBottom: 0 }}>
-            <span style={{ fontSize: 32 }}>{c.icon}</span>
-            <div>
-              <span style={{ fontSize: 24, fontWeight: 700, display: 'block' }}>{c.value}</span>
-              <span style={{ fontSize: 12, color: '#999' }}>{c.label}</span>
+      {/* 统计卡片 */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 32 }}>
+        {cards.map((c, i) => (
+          <div key={i} className="glass-card stat-card" style={{ animationDelay: `${i * 100}ms` }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
+              <span style={{ fontSize: 24, opacity: 0.8 }}>{c.icon}</span>
+              <div className="progress-bar" style={{ width: 60 }}>
+                <div className="progress-fill" style={{ width: `${c.width}%`, background: c.color }} />
+              </div>
             </div>
+            <div style={{ fontSize: 24, fontWeight: 700, color: c.color }}>{c.value}</div>
+            <div style={{ fontSize: 13, color: '#94a3b8', marginTop: 4 }}>{c.label}</div>
           </div>
         ))}
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 15, marginBottom: 15 }}>
-        <div className="card">
-          <div className="card-title">📈 本月消费趋势</div>
-          <Line data={{
-            labels: data.daily_consume.map(x => x.day.slice(5)),
-            datasets: [{ label: '消费(元)', data: data.daily_consume.map(x => x.total), borderColor: '#667eea', backgroundColor: 'rgba(102,126,234,0.1)', fill: true, tension: 0.4 }],
-          }} options={chartOptions} />
+      {/* 趋势图 */}
+      <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 16 }}>
+        <div className="glass-card">
+          <h3 style={{ fontSize: 16, fontWeight: 600, marginBottom: 16 }}>📈 消费趋势</h3>
+          <div style={{ height: 200, display: 'flex', alignItems: 'flex-end', gap: 8, padding: '0 8px' }}>
+            {(stats?.daily_consume || []).map((d: any, i: number) => (
+              <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
+                <div style={{
+                  width: '100%',
+                  height: Math.max(20, (d.total / Math.max(...(stats?.daily_consume || []).map((x: any) => x.total), 1)) * 160),
+                  background: 'linear-gradient(to top, #6366f1, #818cf8)',
+                  borderRadius: '4px 4px 0 0',
+                  transition: 'height 0.5s',
+                }} />
+                <span style={{ fontSize: 10, color: '#64748b' }}>{d.day.slice(5)}</span>
+              </div>
+            ))}
+            {(!stats?.daily_consume || stats.daily_consume.length === 0) && (
+              <div style={{ width: '100%', textAlign: 'center', color: '#64748b', paddingTop: 80 }}>
+                暂无数据，开始记录消费吧
+              </div>
+            )}
+          </div>
         </div>
-        <div className="card">
-          <div className="card-title">🍩 消费品类分布</div>
-          <Doughnut data={{
-            labels: data.consume_categories.map(x => x.category),
-            datasets: [{ data: data.consume_categories.map(x => x.total), backgroundColor: ['#667eea', '#f093fb', '#4facfe', '#43e97b', '#fa709a', '#fee140'] }],
-          }} options={{ responsive: true }} />
-        </div>
-      </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 15 }}>
-        <div className="card">
-          <div className="card-title">📚 学习科目分布</div>
-          <Bar data={{
-            labels: data.study_subjects.map(x => x.subject),
-            datasets: [{ label: '分钟', data: data.study_subjects.map(x => x.minutes), backgroundColor: ['#667eea', '#f093fb', '#4facfe', '#43e97b', '#fa709a'] }],
-          }} options={chartOptions} />
-        </div>
-        <div className="card">
-          <div className="card-title">📅 近期待办</div>
-          <div style={{ fontSize: 14, color: '#666' }}>
-            <p>本月消费: <strong>¥{data.month_consume.toFixed(0)}</strong></p>
-            <p>本周学习: <strong>{data.week_study_hours}小时</strong></p>
-            <p>待办日程: <strong>{data.upcoming_schedules}项</strong></p>
-            <p>即将过期: <strong>{data.expiring_items}件</strong></p>
+        <div className="glass-card">
+          <h3 style={{ fontSize: 16, fontWeight: 600, marginBottom: 16 }}>🍩 品类分布</h3>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            {(stats?.consume_categories || []).map((c: any, i: number) => (
+              <div key={i}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 4 }}>
+                  <span>{c.category}</span>
+                  <span style={{ color: '#94a3b8' }}>¥{c.total.toFixed(0)}</span>
+                </div>
+                <div className="progress-bar">
+                  <div className="progress-fill" style={{
+                    width: `${(c.total / Math.max(...(stats?.consume_categories || []).map((x: any) => x.total), 1)) * 100}%`
+                  }} />
+                </div>
+              </div>
+            ))}
+            {(!stats?.consume_categories || stats.consume_categories.length === 0) && (
+              <div style={{ textAlign: 'center', color: '#64748b', paddingTop: 40 }}>
+                暂无消费记录
+              </div>
+            )}
           </div>
         </div>
       </div>

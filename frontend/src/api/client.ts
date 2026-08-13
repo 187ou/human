@@ -22,9 +22,8 @@ export async function api(path: string, options: RequestInit = {}) {
 
   const res = await fetch(`/api${path}`, { ...options, headers })
   if (res.status === 401) {
-    clearToken()
-    window.location.reload()
-    throw new Error('登录已过期')
+    // 不自动刷新页面，让调用方处理
+    throw new Error('未登录或Token无效')
   }
   const data = await res.json()
   if (res.ok) return data
