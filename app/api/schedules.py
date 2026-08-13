@@ -51,14 +51,15 @@ class ScheduleComplete(BaseModel):
 class RecurringExceptionCreate(BaseModel):
     title: str
     description: str | None = None
-    # {"days_of_week": [1,2,3,4,5], "start_time": "19:00", "end_time": "21:00", "action": "add/pause/skip"}
     rule_expr: dict
     effective_from: datetime
     effective_until: datetime | None = None
 
-    @field_validator("effective_from", mode="before")
+    @field_validator("effective_from", "effective_until", mode="before")
     @classmethod
-    def validate_from(cls, v):
+    def validate_dates(cls, v):
+        if v is None or v == "":
+            return None
         return _parse_dt(v)
 
 
@@ -129,23 +130,27 @@ async def complete_schedule(
 
 @router.get("/conflicts")
 async def detect_conflicts(
+    date: str | None = None,
     session: AsyncSession = Depends(get_session),
     user: User = Depends(get_current_user),
 ):
     """检测日程时间重叠冲突"""
+    target = datetime.strptime(date, "%Y-%m-%d") if date else None
     planner = SchedulePlanner(session, user.id)
-    conflicts = await planner.detect_conflicts()
+    conflicts = await planner.detect_conflicts(target)
     return {"code": 0, "data": conflicts}
 
 
 @router.get("/fragment-slots")
 async def fragment_slots(
+    date: str | None = None,
     session: AsyncSession = Depends(get_session),
     user: User = Depends(get_current_user),
 ):
     """获取碎片时间挪位方案"""
+    target = datetime.strptime(date, "%Y-%m-%d") if date else None
     planner = SchedulePlanner(session, user.id)
-    slots = await planner.suggest_fragment_slots()
+    slots = await planner.suggest_fragment_slots(target)
     return {"code": 0, "data": slots}
 
 
@@ -226,12 +231,14 @@ async def list_exceptions(
 
 @router.get("/exceptions/apply")
 async def apply_exceptions(
+    date: str | None = None,
     session: AsyncSession = Depends(get_session),
     user: User = Depends(get_current_user),
 ):
-    """应用周期性例外到今日"""
+    """应用周期性例外"""
+    target = datetime.strptime(date, "%Y-%m-%d") if date else None
     planner = SchedulePlanner(session, user.id)
-    applied = await planner.apply_recurring_exceptions()
+    applied = await planner.apply_recurring_exceptions(target)
     return {"code": 0, "data": applied}
 
 
@@ -239,23 +246,27 @@ async def apply_exceptions(
 
 @router.get("/late-night")
 async def detect_late_night(
+    date: str | None = None,
     session: AsyncSession = Depends(get_session),
     user: User = Depends(get_current_user),
 ):
     """检测熬夜情况"""
+    target = datetime.strptime(date, "%Y-%m-%d") if date else None
     planner = SchedulePlanner(session, user.id)
-    result = await planner.detect_late_night()
+    result = await planner.detect_late_night(target)
     return {"code": 0, "data": result}
 
 
 @router.get("/adjusted-load")
 async def adjusted_load(
+    date: str | None = None,
     session: AsyncSession = Depends(get_session),
     user: User = Depends(get_current_user),
 ):
     """获取调整后的任务负荷"""
+    target = datetime.strptime(date, "%Y-%m-%d") if date else None
     planner = SchedulePlanner(session, user.id)
-    result = await planner.get_adjusted_task_load()
+    result = await planner.get_adjusted_task_load(target)
     return {"code": 0, "data": result}
 
 
