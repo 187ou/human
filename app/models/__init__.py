@@ -8,6 +8,7 @@ from app.models.behavior import BehaviorLog
 from app.models.rule import UserRule
 from app.models.notification import Notification
 from app.models.vector import UserPreferenceVector, ConversationVector
+from app.models.snapshot import EvolutionSnapshot, SyncRecord, LLMRejectLog, LargeExpenseRecord
 
 __all__ = [
     "User", "Schedule", "ScheduleItem", "RecurringException",
@@ -19,4 +20,5 @@ __all__ = [
     "UserRule",
     "Notification",
     "UserPreferenceVector", "ConversationVector",
+    "EvolutionSnapshot", "SyncRecord", "LLMRejectLog", "LargeExpenseRecord",
 ]

@@ -55,6 +55,11 @@ class EvolutionEngine:
 
     async def run_full(self) -> dict[str, Any]:
         """每周全量深度演化：全盘复盘习惯"""
+        # 0. 创建演化快照（用于回滚）
+        from app.services.snapshot_service import SnapshotService
+        snap_svc = SnapshotService(self.session, self.user_id)
+        snapshot = await snap_svc.create_snapshot("full", description=f"全量演化前快照")
+
         # 1. 挖掘新规则
         new_rules = await self.miner.mine_all()
 
@@ -72,6 +77,7 @@ class EvolutionEngine:
         await self.session.commit()
         return {
             "mode": "full",
+            "snapshot_version": snapshot.version,
             "rules_count": len(saved),
             "conflicts": len(conflicts),
             "prompt_evaluation": prompt_result,

@@ -1,18 +1,18 @@
-"""向量存储服务：用户偏好+对话向量+习惯向量+方案召回（轻量级，兼容SQLite）"""
+"""向量存储服务：ChromaDB 向量数据库封装"""
 import hashlib
-import json
 import re
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any
 
-from sqlalchemy import select, and_, func
+from sqlalchemy import select, and_
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.vector import UserPreferenceVector, ConversationVector
+from app.vector_db import vector_db
 
 
 class VectorStore:
-    """轻量级向量存储（SQLite兼容）"""
+    """向量数据库封装（ChromaDB 后端）"""
 
     def __init__(self, session: AsyncSession, user_id: int):
         self.session = session
@@ -22,8 +22,15 @@ class VectorStore:
 
     async def store_preference(self, dimension: str, description: str,
                                 embedding: list[float] | None = None,
-                                source: str = "auto") -> UserPreferenceVector:
-        """存储用户偏好向量"""
+                                source: str = "auto") -> str:
+        """存储用户偏好向量（ChromaDB + 关系库双写）"""
+        # ChromaDB 存储（向量检索）
+        vec_id = await vector_db.store_preference(
+            self.user_id, dimension, description,
+            metadata={"source": source}
+        )
+
+        # 关系库存储（结构化查询）
         vec = UserPreferenceVector(
             user_id=self.user_id,
             dimension=dimension,
@@ -33,7 +40,7 @@ class VectorStore:
         )
         self.session.add(vec)
         await self.session.flush()
-        return vec
+        return vec_id
 
     async def get_preferences(self, dimension: str | None = None, limit: int = 10) -> list[UserPreferenceVector]:
         """获取用户偏好"""
@@ -44,36 +51,19 @@ class VectorStore:
         return list(result.scalars().all())
 
     async def search_similar_preferences(self, query_text: str, dimension: str | None = None, limit: int = 5) -> list[dict]:
-        """基于文本相似度搜索偏好（轻量级：关键词匹配+TF-IDF加权）"""
-        stmt = select(UserPreferenceVector).where(UserPreferenceVector.user_id == self.user_id)
-        if dimension:
-            stmt = stmt.where(UserPreferenceVector.dimension == dimension)
-
-        result = await self.session.execute(stmt)
-        preferences = result.scalars().all()
-
-        # 关键词匹配 + 词频加权
-        query_words = set(_tokenize(query_text))
-        scored = []
-        for pref in preferences:
-            desc_words = set(_tokenize(pref.description))
-            overlap = query_words & desc_words
-            if overlap:
-                score = len(overlap) / max(len(query_words), 1)
-                # 考虑时效性（越近越重要）
-                days_old = (datetime.utcnow() - pref.updated_at).days
-                time_weight = max(0.5, 1.0 - days_old / 365)
-                scored.append({"preference": pref, "score": round(score * time_weight, 3)})
-
-        scored.sort(key=lambda x: x["score"], reverse=True)
-        return scored[:limit]
+        """向量相似度搜索偏好"""
+        return await vector_db.search_preferences(self.user_id, query_text, dimension, limit)
 
     # ==================== 对话向量 ====================
 
     async def store_conversation(self, summary: str, intent_type: str | None = None,
                                   result_summary: str | None = None,
-                                  embedding: list[float] | None = None) -> ConversationVector:
+                                  embedding: list[float] | None = None) -> str:
         """存储对话向量"""
+        vec_id = await vector_db.store_conversation(
+            self.user_id, summary, intent_type, result_summary
+        )
+
         vec = ConversationVector(
             user_id=self.user_id,
             summary=summary,
@@ -83,7 +73,7 @@ class VectorStore:
         )
         self.session.add(vec)
         await self.session.flush()
-        return vec
+        return vec_id
 
     async def get_recent_conversations(self, limit: int = 5) -> list[ConversationVector]:
         """获取最近对话"""
@@ -95,22 +85,13 @@ class VectorStore:
         )
         return list(result.scalars().all())
 
-    async def search_conversations(self, keyword: str, limit: int = 5) -> list[ConversationVector]:
-        """搜索历史对话"""
-        result = await self.session.execute(
-            select(ConversationVector)
-            .where(and_(
-                ConversationVector.user_id == self.user_id,
-                ConversationVector.summary.contains(keyword),
-            ))
-            .order_by(ConversationVector.created_at.desc())
-            .limit(limit)
-        )
-        return list(result.scalars().all())
+    async def search_conversations(self, keyword: str, limit: int = 5) -> list[dict]:
+        """向量搜索历史对话"""
+        return await vector_db.search_conversations(self.user_id, keyword, limit)
 
-    # ==================== 习惯向量（从行为日志生成） ====================
+    # ==================== 习惯向量 ====================
 
-    async def vectorize_habits(self) -> list[UserPreferenceVector]:
+    async def vectorize_habits(self) -> list[str]:
         """从行为日志生成习惯向量"""
         from app.models.behavior import BehaviorLog
         from sqlalchemy import select, func
@@ -119,12 +100,10 @@ class VectorStore:
         vectors = []
 
         for dim in dimensions:
-            # 统计该维度的关键特征
             result = await self.session.execute(
                 select(
                     func.count(BehaviorLog.id),
                     func.avg(BehaviorLog.value),
-                    func.group_concat(BehaviorLog.event_type),
                 ).where(and_(
                     BehaviorLog.user_id == self.user_id,
                     BehaviorLog.dimension == dim,
@@ -132,12 +111,11 @@ class VectorStore:
                 ))
             )
             row = result.one()
-            count, avg_value, event_types = row
+            count, avg_value = row
 
             if count == 0:
                 continue
 
-            # 生成习惯描述
             if dim == "time":
                 description = f"近期记录{count}条日程，平均完成质量{avg_value or 0:.1f}"
             elif dim == "study":
@@ -149,65 +127,32 @@ class VectorStore:
             else:
                 description = f"近期{count}条记录"
 
-            # 生成简单哈希嵌入（用于相似度比较）
-            embedding = _simple_hash_embedding(description)
-
-            vec = await self.store_preference(dim, description, embedding, source="auto")
-            vectors.append(vec)
+            vec_id = await vector_db.store_habit(self.user_id, dim, description)
+            vectors.append(vec_id)
 
         await self.session.flush()
         return vectors
 
+    async def search_habits(self, query: str, habit_type: str | None = None, limit: int = 5) -> list[dict]:
+        """搜索相似习惯"""
+        return await vector_db.search_habits(self.user_id, query, habit_type, limit)
+
     # ==================== 方案召回 ====================
 
+    async def store_plan(self, plan_type: str, description: str, plan_data: dict | None = None) -> str:
+        """存储历史方案"""
+        return await vector_db.store_plan(self.user_id, plan_type, description, plan_data)
+
     async def recall_similar_plans(self, plan_type: str, context: str, limit: int = 3) -> list[dict]:
-        """召回相似历史方案（新建计划时参考）"""
-        # 1. 搜索相关偏好
-        pref_results = await self.search_similar_preferences(context, dimension=plan_type, limit=limit)
+        """召回相似历史方案"""
+        return await vector_db.recall_similar_plans(self.user_id, plan_type, context, limit)
 
-        # 2. 搜索相关对话
-        conv_results = await self.search_conversations(context, limit=limit)
+    # ==================== 综合召回 ====================
 
-        # 3. 组合召回结果
-        recalls = []
-        for pref in pref_results:
-            recalls.append({
-                "type": "preference",
-                "score": pref["score"],
-                "description": pref["preference"].description,
-                "dimension": pref["preference"].dimension,
-            })
-
-        for conv in conv_results:
-            recalls.append({
-                "type": "conversation",
-                "score": 0.5,
-                "description": conv.summary,
-                "intent_type": conv.intent_type,
-                "result": conv.result_summary,
-            })
-
-        recalls.sort(key=lambda x: x["score"], reverse=True)
-        return recalls[:limit]
-
-
-def _tokenize(text: str) -> list[str]:
-    """简单分词"""
-    return re.findall(r'[一-鿿]+|[a-zA-Z]+', text.lower())
-
-
-def _simple_hash_embedding(text: str, dim: int = 64) -> list[float]:
-    """生成简单哈希嵌入（无需外部模型）"""
-    embedding = [0.0] * dim
-    words = _tokenize(text)
-    for word in words:
-        hash_val = int(hashlib.md5(word.encode()).hexdigest(), 16)
-        for i in range(dim):
-            bit = (hash_val >> i) & 1
-            embedding[i] += 1.0 if bit else -1.0
-
-    # 归一化
-    magnitude = sum(x**2 for x in embedding) ** 0.5
-    if magnitude > 0:
-        embedding = [round(x / magnitude, 4) for x in embedding]
-    return embedding
+    async def recall_all(self, context: str, limit: int = 5) -> dict[str, list[dict]]:
+        """综合召回：偏好+对话+习惯+方案"""
+        return {
+            "preferences": await self.search_similar_preferences(context, limit=limit),
+            "conversations": await self.search_conversations(context, limit=limit),
+            "habits": await self.search_habits(context, limit=limit),
+        }

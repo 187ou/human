@@ -68,8 +68,16 @@ async def create_consume(
     # 检查预算提醒
     alerts = await analyzer.check_budget_alerts()
 
+    # 大额支出守护
+    from app.services.expense_guard import ExpenseGuard
+    expense_guard = ExpenseGuard(session, user.id)
+    large_expense_result = await expense_guard.check_large_expense(data.amount, data.category, data.merchant)
+
     await session.commit()
-    return {"code": 0, "data": {"id": record.id, "tag": tag, "flex_result": flex_result, "alerts": len(alerts)}}
+    return {"code": 0, "data": {
+        "id": record.id, "tag": tag, "flex_result": flex_result,
+        "alerts": len(alerts), "large_expense": large_expense_result,
+    }}
 
 
 @router.get("")

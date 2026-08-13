@@ -1,7 +1,7 @@
 """API路由汇总"""
 from fastapi import APIRouter
 
-from app.api import auth, schedules, consumes, items, studies, travels, agent, evolution, stats, schedule_nlp, scenarios, notifications, nlp, vectors, profile
+from app.api import auth, schedules, consumes, items, studies, travels, agent, evolution, stats, schedule_nlp, scenarios, notifications, nlp, vectors, profile, snapshots, sync, guard
 
 api_router = APIRouter()
 
@@ -20,3 +20,6 @@ api_router.include_router(notifications.router, prefix="/notifications", tags=["
 api_router.include_router(nlp.router, prefix="/nlp", tags=["自然语言解析"])
 api_router.include_router(vectors.router, prefix="/vectors", tags=["向量存储"])
 api_router.include_router(profile.router, prefix="/profile", tags=["用户画像"])
+api_router.include_router(snapshots.router, prefix="/snapshots", tags=["演化快照"])
+api_router.include_router(sync.router, prefix="/sync", tags=["多设备同步"])
+api_router.include_router(guard.router, prefix="/guard", tags=["守护机制"])
