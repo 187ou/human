@@ -1,7 +1,7 @@
 """API路由汇总"""
 from fastapi import APIRouter
 
-from app.api import auth, schedules, consumes, items, studies, travels, agent, evolution, stats, schedule_nlp, scenarios
+from app.api import auth, schedules, consumes, items, studies, travels, agent, evolution, stats, schedule_nlp, scenarios, notifications, nlp, vectors
 
 api_router = APIRouter()
 
@@ -16,3 +16,6 @@ api_router.include_router(evolution.router, prefix="/evolution", tags=["自适�
 api_router.include_router(stats.router, prefix="/stats", tags=["数据统计"])
 api_router.include_router(schedule_nlp.router, prefix="/schedule-nlp", tags=["自然语言日程"])
 api_router.include_router(scenarios.router, prefix="/scenarios", tags=["跨Agent场景联动"])
+api_router.include_router(notifications.router, prefix="/notifications", tags=["消息推送"])
+api_router.include_router(nlp.router, prefix="/nlp", tags=["自然语言解析"])
+api_router.include_router(vectors.router, prefix="/vectors", tags=["向量存储"])

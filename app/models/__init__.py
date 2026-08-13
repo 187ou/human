@@ -6,6 +6,8 @@ from app.models.study import StudyPlan, StudyRecord, KnowledgePoint, WrongQuesti
 from app.models.travel import TravelPlan
 from app.models.behavior import BehaviorLog
 from app.models.rule import UserRule
+from app.models.notification import Notification
+from app.models.vector import UserPreferenceVector, ConversationVector
 
 __all__ = [
     "User", "Schedule", "ScheduleItem", "RecurringException",
@@ -15,4 +17,6 @@ __all__ = [
     "TravelPlan",
     "BehaviorLog",
     "UserRule",
+    "Notification",
+    "UserPreferenceVector", "ConversationVector",
 ]

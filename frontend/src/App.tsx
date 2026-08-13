@@ -11,6 +11,8 @@ import Study from './pages/Study'
 import Travel from './pages/Travel'
 import Evolution from './pages/Evolution'
 import Scenarios from './pages/Scenarios'
+import NotificationCenter from './components/NotificationCenter'
+import QuickCommands from './components/QuickCommands'
 
 export default function App() {
   const { user, loading } = useAuth()
@@ -19,19 +21,23 @@ export default function App() {
   if (!user) return <RoleSelect />
 
   return (
-    <Routes>
-      <Route element={<MainLayout />}>
-        <Route path="/" element={<Navigate to="/dashboard" />} />
-        <Route path="/dashboard" element={<Dashboard />} />
-        <Route path="/chat" element={<Chat />} />
-        <Route path="/schedule" element={<Schedule />} />
-        <Route path="/consume" element={<Consume />} />
-        <Route path="/item" element={<Item />} />
-        <Route path="/study" element={<Study />} />
-        <Route path="/travel" element={<Travel />} />
-        <Route path="/evolution" element={<Evolution />} />
-        <Route path="/scenarios" element={<Scenarios />} />
-      </Route>
-    </Routes>
+    <>
+      <NotificationCenter />
+      <QuickCommands />
+      <Routes>
+        <Route element={<MainLayout />}>
+          <Route path="/" element={<Navigate to="/dashboard" />} />
+          <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/chat" element={<Chat />} />
+          <Route path="/schedule" element={<Schedule />} />
+          <Route path="/consume" element={<Consume />} />
+          <Route path="/item" element={<Item />} />
+          <Route path="/study" element={<Study />} />
+          <Route path="/travel" element={<Travel />} />
+          <Route path="/evolution" element={<Evolution />} />
+          <Route path="/scenarios" element={<Scenarios />} />
+        </Route>
+      </Routes>
+    </>
   )
 }

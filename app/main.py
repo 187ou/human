@@ -20,7 +20,12 @@ async def lifespan(app: FastAPI):
     # 自动初始化角色数据
     from app.seed import seed
     await seed()
+    # 启动定时任务调度器
+    from app.tasks import init_scheduler
+    init_scheduler()
     yield
+    from app.tasks import shutdown_scheduler
+    shutdown_scheduler()
     await close_db()
     logger.info("database connection closed")
 
