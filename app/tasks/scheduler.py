@@ -87,7 +87,7 @@ async def notification_push_task():
 
 
 async def nightly_evolution_task():
-    """夜间增量演化任务：每天2:00执行"""
+    """夜间增量演化任务：每天2:00执行（第2层：轻量化演化）"""
     logger.info("[Scheduler] 开始夜间增量演化...")
     async with AsyncSessionLocal() as session:
         try:
@@ -97,8 +97,9 @@ async def nightly_evolution_task():
             total_rules = 0
             for (user_id,) in users.all():
                 try:
-                    engine = EvolutionEngine(session, user_id)
-                    result = await engine.run_incremental()
+                    from app.services.evolution_engine import EvolutionEngine as LayeredEngine
+                    engine = LayeredEngine(session, user_id)
+                    result = await engine.nightly_evolution()
                     total_rules += result.get("rules_updated", 0)
                     await session.flush()
                 except Exception as e:
@@ -107,6 +108,50 @@ async def nightly_evolution_task():
             logger.info(f"[Scheduler] 夜间增量演化完成，更新{total_rules}条规则")
         except Exception as e:
             logger.error(f"夜间增量演化任务失败: {e}")
+
+
+async def weekly_evolution_task():
+    """周度全局深度演化任务：每周日3:00执行（第3层：深度演化）"""
+    logger.info("[Scheduler] 开始周度全局深度演化...")
+    async with AsyncSessionLocal() as session:
+        try:
+            from sqlalchemy import select
+            from app.models.user import User
+            users = await session.execute(select(User.id))
+            for (user_id,) in users.all():
+                try:
+                    from app.services.evolution_engine import EvolutionEngine as LayeredEngine
+                    engine = LayeredEngine(session, user_id)
+                    result = await engine.weekly_evolution()
+                    await session.flush()
+                except Exception as e:
+                    logger.error(f"用户{user_id}深度演化失败: {e}")
+            await session.commit()
+            logger.info("[Scheduler] 周度全局深度演化完成")
+        except Exception as e:
+            logger.error(f"周度全局深度演化任务失败: {e}")
+
+
+async def meta_evolution_task():
+    """元演化调控任务：每天0:00执行"""
+    logger.info("[Scheduler] 开始元演化调控...")
+    async with AsyncSessionLocal() as session:
+        try:
+            from sqlalchemy import select
+            from app.models.user import User
+            users = await session.execute(select(User.id))
+            for (user_id,) in users.all():
+                try:
+                    from app.services.meta_agent import MetaEvolutionAgent
+                    agent = MetaEvolutionAgent(session, user_id)
+                    await agent.evaluate_and_adjust()
+                    await session.flush()
+                except Exception as e:
+                    logger.error(f"用户{user_id}元演化调控失败: {e}")
+            await session.commit()
+            logger.info("[Scheduler] 元演化调控完成")
+        except Exception as e:
+            logger.error(f"元演化调控任务失败: {e}")
 
 
 async def study_checkin_reminder_task():
@@ -141,8 +186,12 @@ def init_scheduler():
     scheduler.add_job(notification_push_task, CronTrigger(hour=7, minute=0), id="notify_morning")
     scheduler.add_job(notification_push_task, CronTrigger(hour=12, minute=0), id="notify_noon")
     scheduler.add_job(notification_push_task, CronTrigger(hour=18, minute=0), id="notify_evening")
-    # 夜间增量演化：2:00
+    # 夜间增量演化：2:00（第2层）
     scheduler.add_job(nightly_evolution_task, CronTrigger(hour=2, minute=0), id="nightly_evolution")
+    # 周度全局深度演化：周日3:00（第3层）
+    scheduler.add_job(weekly_evolution_task, CronTrigger(day_of_week="sun", hour=3, minute=0), id="weekly_evolution")
+    # 元演化调控：每天0:00（Meta-Agent）
+    scheduler.add_job(meta_evolution_task, CronTrigger(hour=0, minute=0), id="meta_evolution")
     # 学习打卡提醒：20:00
     scheduler.add_job(study_checkin_reminder_task, CronTrigger(hour=20, minute=0), id="study_checkin")
     scheduler.start()

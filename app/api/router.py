@@ -1,7 +1,7 @@
 """API路由汇总"""
 from fastapi import APIRouter
 
-from app.api import auth, schedules, consumes, items, studies, travels, agent, evolution, stats, schedule_nlp, scenarios, notifications, nlp, vectors, profile, snapshots, sync, guard, innovation
+from app.api import auth, schedules, consumes, items, studies, travels, agent, evolution, evolution_advanced, stats, schedule_nlp, scenarios, notifications, nlp, vectors, profile, snapshots, sync, guard, innovation, advanced, fsm, engine, mining, rule_population, memory, team, gepa, stability
 
 api_router = APIRouter()
 
@@ -24,3 +24,13 @@ api_router.include_router(snapshots.router, prefix="/snapshots", tags=["演化�
 api_router.include_router(sync.router, prefix="/sync", tags=["多设备同步"])
 api_router.include_router(guard.router, prefix="/guard", tags=["守护机制"])
 api_router.include_router(innovation.router, prefix="/innovation", tags=["核心创新"])
+api_router.include_router(advanced.router, prefix="/advanced", tags=["高级智能"])
+api_router.include_router(fsm.router, prefix="/fsm", tags=["多Agent协同"])
+api_router.include_router(evolution_advanced.router, prefix="/evolution-advanced", tags=["自演化高级机制"])
+api_router.include_router(engine.router, prefix="/engine", tags=["底层引擎"])
+api_router.include_router(mining.router, prefix="/mining", tags=["数据挖掘层"])
+api_router.include_router(rule_population.router, prefix="/rules", tags=["规则体系"])
+api_router.include_router(memory.router, prefix="/memory", tags=["记忆与经验"])
+api_router.include_router(team.router, prefix="/team", tags=["多Agent协同"])
+api_router.include_router(gepa.router, prefix="/gepa", tags=["GEPA Prompt进化"])
+api_router.include_router(stability.router, prefix="/stability", tags=["生活稳态维持"])
