@@ -1,0 +1,90 @@
+<component name="InspectionProjectProfileManager">
+  <profile version="1.0">
+    <option name="myName" value="Project Default" />
+    <inspection_tool class="PyPackageRequirementsInspection" enabled="true" level="WARNING" enabled_by_default="true">
+      <option name="ignoredPackages">
+        <list>
+          <option value="context" />
+          <option value="langchain" />
+          <option value="langchain-anthropic" />
+          <option value="langchain-openai" />
+          <option value="Flask" />
+          <option value="Flask-WTF" />
+          <option value="Werkzeug" />
+          <option value="Jinja2" />
+          <option value="itsdangerous" />
+          <option value="PyMySQL" />
+          <option value="SQLAlchemy" />
+          <option value="Flask-SQLAlchemy" />
+          <option value="numpy" />
+          <option value="pandas" />
+          <option value="scikit-learn" />
+          <option value="scipy" />
+          <option value="matplotlib" />
+          <option value="seaborn" />
+          <option value="requests" />
+          <option value="beautifulsoup4" />
+          <option value="lxml" />
+          <option value="Scrapy" />
+          <option value="fake-useragent" />
+          <option value="pyppeteer" />
+          <option value="aiohttp" />
+          <option value="nltk" />
+          <option value="plotly" />
+          <option value="pyecharts" />
+          <option value="joblib" />
+          <option value="xgboost" />
+          <option value="lightgbm" />
+          <option value="python-dotenv" />
+          <option value="tqdm" />
+          <option value="colorama" />
+          <option value="openpyxl" />
+          <option value="xlrd" />
+          <option value="pytest" />
+          <option value="coverage" />
+          <option value="kaleido" />
+          <option value="curl-cffi" />
+          <option value="deepagents" />
+          <option value="langchain-core" />
+          <option value="langchain-community" />
+          <option value="langgraph" />
+          <option value="openai" />
+          <option value="fastapi" />
+          <option value="uvicorn" />
+          <option value="python-multipart" />
+          <option value="mysql-connector-python" />
+          <option value="python-docx" />
+          <option value="pypdf" />
+          <option value="aiofiles" />
+          <option value="markdown" />
+          <option value="reportlab" />
+          <option value="tavily-python" />
+          <option value="ragflow-sdk" />
+          <option value="PyYAML" />
+          <option value="pydantic" />
+          <option value="typing-extensions" />
+          <option value="autogen-agentchat" />
+          <option value="autogen-ext" />
+          <option value="flet" />
+          <option value="pydantic-settings" />
+          <option value="httpx" />
+          <option value="pyinstaller" />
+        </list>
+      </option>
+    </inspection_tool>
+    <inspection_tool class="PyStubPackagesAdvertiser" enabled="true" level="WARNING" enabled_by_default="true">
+      <option name="ignoredPackages">
+        <list>
+          <option value="pandas" />
+        </list>
+      </option>
+    </inspection_tool>
+    <inspection_tool class="PyUnresolvedReferencesInspection" enabled="true" level="WARNING" enabled_by_default="true">
+      <option name="ignoredIdentifiers">
+        <list>
+          <option value="dashscope" />
+        </list>
+      </option>
+    </inspection_tool>
+  </profile>
+</component>

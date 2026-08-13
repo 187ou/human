@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HumanAgent - 自适应生活智能助手</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+
+<!-- 角色选择页 -->
+<div id="rolePage" class="role-page">
+    <div class="role-box">
+        <h1>🧠 HumanAgent</h1>
+        <p class="subtitle">选择一个角色开始使用</p>
+        <div id="roleList" class="role-list"></div>
+    </div>
+</div>
+
+<!-- 主应用 -->
+<div id="appPage" class="app hidden">
+    <aside class="sidebar">
+        <div class="logo">
+            <h1>🧠 HumanAgent</h1>
+            <p>自适应生活助手</p>
+        </div>
+        <nav>
+            <a href="#" class="active" data-tab="dashboard">📊 概览</a>
+            <a href="#" data-tab="chat">💬 智能对话</a>
+            <a href="#" data-tab="schedule">📅 时间规划</a>
+            <a href="#" data-tab="consume">💰 消费记账</a>
+            <a href="#" data-tab="item">📦 物品收纳</a>
+            <a href="#" data-tab="study">📚 学习督导</a>
+            <a href="#" data-tab="travel">🚗 出行处理</a>
+            <a href="#" data-tab="evolution">🧬 自适应演化</a>
+        </nav>
+        <div class="sidebar-footer">
+            <div class="user-info">
+                <span id="sidebarUsername">用户</span>
+                <button onclick="switchRole()" class="btn-logout">切换角色</button>
+            </div>
+        </div>
+    </aside>
+
+    <main class="main">
+        <!-- Dashboard -->
+        <section id="tab-dashboard" class="tab-content active">
+            <h2>📊 数据概览</h2>
+            <div class="stat-cards">
+                <div class="stat-card"><div class="stat-icon">💰</div><div class="stat-info"><span class="stat-value" id="statConsume">¥0</span><span class="stat-label">本月消费</span></div></div>
+                <div class="stat-card"><div class="stat-icon">📚</div><div class="stat-info"><span class="stat-value" id="statStudy">0h</span><span class="stat-label">本周学习</span></div></div>
+                <div class="stat-card"><div class="stat-icon">📅</div><div class="stat-info"><span class="stat-value" id="statSchedule">0</span><span class="stat-label">待办日程</span></div></div>
+                <div class="stat-card"><div class="stat-icon">⏰</div><div class="stat-info"><span class="stat-value" id="statExpire">0</span><span class="stat-label">即将过期</span></div></div>
+            </div>
+            <div class="charts-row">
+                <div class="chart-card"><h3>📈 本月消费趋势</h3><canvas id="consumeChart" height="200"></canvas></div>
+                <div class="chart-card"><h3>🍩 消费品类分布</h3><canvas id="categoryChart" height="200"></canvas></div>
+            </div>
+            <div class="charts-row">
+                <div class="chart-card"><h3>📚 学习科目分布</h3><canvas id="studyChart" height="200"></canvas></div>
+                <div class="chart-card"><h3>🧬 我的专属规则</h3><div id="rulesPreview" class="rules-preview"></div></div>
+            </div>
+        </section>
+
+        <section id="tab-chat" class="tab-content">
+            <h2>💬 智能对话</h2>
+            <div class="chat-container">
+                <div class="chat-box" id="chatBox">
+                    <div class="msg bot"><div class="bubble">你好！我是你的智能生活助手。可以问我消费分析、日程安排、学习效率等问题。</div></div>
+                </div>
+                <div class="chat-input">
+                    <input type="text" id="chatInput" placeholder="输入需求..." onkeypress="if(event.key==='Enter')sendChat()">
+                    <button onclick="sendChat()">发送</button>
+                </div>
+            </div>
+        </section>
+
+        <section id="tab-schedule" class="tab-content">
+            <h2>📅 时间规划</h2>
+            <div class="card">
+                <h3>添加日程</h3>
+                <div class="form-row">
+                    <input type="text" id="scTitle" placeholder="标题">
+                    <select id="scCategory"><option value="fixed">固定日程</option><option value="flexible">弹性日程</option><option value="study">学习</option><option value="sport">运动</option></select>
+                </div>
+                <div class="form-row">
+                    <input type="datetime-local" id="scStart">
+                    <input type="datetime-local" id="scEnd">
+                    <button onclick="addSchedule()">添加</button>
+                </div>
+            </div>
+            <div id="scheduleList" class="list"></div>
+        </section>
+
+        <section id="tab-consume" class="tab-content">
+            <h2>💰 消费记账</h2>
+            <div class="card">
+                <h3>记一笔</h3>
+                <div class="form-row">
+                    <input type="number" id="cAmount" placeholder="金额" step="0.01">
+                    <select id="cCategory"><option value="food">🍜 餐饮</option><option value="shopping">🛒 购物</option><option value="transport">🚗 交通</option><option value="entertainment">🎮 娱乐</option><option value="study">📚 学习</option><option value="rent">🏠 房租</option></select>
+                    <input type="text" id="cMerchant" placeholder="商家">
+                    <button onclick="addConsume()">记账</button>
+                </div>
+            </div>
+            <div id="consumeList" class="list"></div>
+        </section>
+
+        <section id="tab-item" class="tab-content">
+            <h2>📦 物品收纳</h2>
+            <div class="card">
+                <h3>添加物品</h3>
+                <div class="form-row">
+                    <input type="text" id="iName" placeholder="名称">
+                    <input type="text" id="iLocation" placeholder="位置">
+                    <select id="iCategory"><option value="food">食品</option><option value="cosmetic">护肤品</option><option value="medicine">药品</option><option value="card">会员卡</option><option value="coupon">优惠券</option><option value="document">证件</option><option value="other">其他</option></select>
+                </div>
+                <div class="form-row">
+                    <input type="datetime-local" id="iExpire">
+                    <button onclick="addItem()">添加</button>
+                </div>
+            </div>
+            <div id="itemList" class="list"></div>
+        </section>
+
+        <section id="tab-study" class="tab-content">
+            <h2>📚 学习督导</h2>
+            <div class="card">
+                <h3>记录学习</h3>
+                <div class="form-row">
+                    <input type="text" id="stSubject" placeholder="学科">
+                    <input type="number" id="stDuration" placeholder="时长(分)">
+                    <input type="number" id="stEfficiency" placeholder="效率0-1" step="0.1" min="0" max="1">
+                </div>
+                <div class="form-row">
+                    <label class="check-label"><input type="checkbox" id="stDelayed"> 拖延后完成</label>
+                    <button onclick="addStudy()">记录</button>
+                </div>
+            </div>
+            <div id="studyList" class="list"></div>
+        </section>
+
+        <section id="tab-travel" class="tab-content">
+            <h2>🚗 出行</h2>
+            <div class="card">
+                <h3>添加出行</h3>
+                <div class="form-row">
+                    <input type="text" id="tTitle" placeholder="标题">
+                    <input type="text" id="tDest" placeholder="目的地">
+                    <select id="tType"><option value="trip">旅行</option><option value="commute">通勤</option><option value="flight">航班</option><option value="hotel">住宿</option></select>
+                </div>
+                <div class="form-row">
+                    <input type="datetime-local" id="tDepart">
+                    <button onclick="addTravel()">添加</button>
+                </div>
+            </div>
+            <div id="travelList" class="list"></div>
+        </section>
+
+        <section id="tab-evolution" class="tab-content">
+            <h2>🧬 自适应演化</h2>
+            <div class="card evolution-card">
+                <p>系统根据行为数据自动学习，生成专属规则。支持增量演化（每日轻量）和全量深度演化（每周复盘）。</p>
+                <div class="evo-actions">
+                    <button onclick="runEvolution('incremental')" class="btn-primary">🌙 增量演化</button>
+                    <button onclick="runEvolution('full')">🔬 全量深度演化</button>
+                </div>
+            </div>
+            <div class="card">
+                <div class="evo-actions" style="margin-bottom:15px">
+                    <button onclick="loadRules()">📋 刷新规则列表</button>
+                </div>
+                <div id="rulesList" class="rules-list"></div>
+            </div>
+        </section>
+    </main>
+</div>
+
+<script src="/static/vendor/chart.umd.min.js"></script>
+<script src="/static/app.js"></script>
+</body>
+</html>
