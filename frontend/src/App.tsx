@@ -11,6 +11,7 @@ import Study from './pages/Study'
 import Travel from './pages/Travel'
 import Evolution from './pages/Evolution'
 import Scenarios from './pages/Scenarios'
+import Profile from './pages/Profile'
 import NotificationCenter from './components/NotificationCenter'
 import QuickCommands from './components/QuickCommands'
 
@@ -36,6 +37,7 @@ export default function App() {
           <Route path="/travel" element={<Travel />} />
           <Route path="/evolution" element={<Evolution />} />
           <Route path="/scenarios" element={<Scenarios />} />
+        <Route path="/profile" element={<Profile />} />
         </Route>
       </Routes>
     </>

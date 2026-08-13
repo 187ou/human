@@ -70,3 +70,28 @@ async def get_conversations(
         {"id": v.id, "summary": v.summary, "intent_type": v.intent_type, "created_at": v.created_at.isoformat()}
         for v in items
     ]}
+
+
+@router.post("/vectorize-habits")
+async def vectorize_habits(
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+):
+    """从行为日志生成习惯向量"""
+    store = VectorStore(session, user.id)
+    vectors = await store.vectorize_habits()
+    await session.commit()
+    return {"code": 0, "data": {"vectorized": len(vectors)}}
+
+
+@router.get("/recall")
+async def recall_plans(
+    plan_type: str,
+    context: str,
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+):
+    """召回相似历史方案"""
+    store = VectorStore(session, user.id)
+    recalls = await store.recall_similar_plans(plan_type, context)
+    return {"code": 0, "data": recalls}

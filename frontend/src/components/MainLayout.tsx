@@ -11,6 +11,7 @@ const navItems = [
   { path: '/travel', label: '🚗 出行' },
   { path: '/evolution', label: '🧬 演化' },
   { path: '/scenarios', label: '🔗 联动' },
+  { path: '/profile', label: '👤 画像' },
 ]
 
 export default function MainLayout() {

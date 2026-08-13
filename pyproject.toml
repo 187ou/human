@@ -26,6 +26,7 @@ dependencies = [
     "passlib[bcrypt]>=1.7.4",
     "bcrypt==4.0.1",
     "apscheduler>=3.11.3",
+    "chromadb>=1.5.9",
 ]
 
 [project.optional-dependencies]
