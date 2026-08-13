@@ -1,4 +1,4 @@
-"""时间规划API"""
+"""时间规划API（含冲突检测、突发场景、例外日程、熬夜适配）"""
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -7,9 +7,10 @@ from sqlalchemy import select, and_
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_session, get_current_user
-from app.models.schedule import Schedule, ScheduleItem
+from app.models.schedule import Schedule, ScheduleItem, RecurringException
 from app.models.user import User
 from app.services.behavior_collector import BehaviorCollector
+from app.services.schedule_planner import SchedulePlanner
 
 router = APIRouter()
 
@@ -42,10 +43,26 @@ class ScheduleCreate(BaseModel):
 
 
 class ScheduleComplete(BaseModel):
-    quality: float = 1.0  # 完成质量 0-1
+    quality: float = 1.0
     duration_min: int = 0
     is_delayed: bool = False
 
+
+class RecurringExceptionCreate(BaseModel):
+    title: str
+    description: str | None = None
+    # {"days_of_week": [1,2,3,4,5], "start_time": "19:00", "end_time": "21:00", "action": "add/pause/skip"}
+    rule_expr: dict
+    effective_from: datetime
+    effective_until: datetime | None = None
+
+    @field_validator("effective_from", mode="before")
+    @classmethod
+    def validate_from(cls, v):
+        return _parse_dt(v)
+
+
+# ==================== CRUD ====================
 
 @router.post("")
 async def create_schedule(
@@ -54,14 +71,9 @@ async def create_schedule(
     user: User = Depends(get_current_user),
 ):
     schedule = Schedule(
-        user_id=user.id,
-        title=data.title,
-        category=data.category,
-        start_time=data.start_time,
-        end_time=data.end_time,
-        location=data.location,
-        description=data.description,
-        source=data.source,
+        user_id=user.id, title=data.title, category=data.category,
+        start_time=data.start_time, end_time=data.end_time,
+        location=data.location, description=data.description, source=data.source,
     )
     session.add(schedule)
     await session.commit()
@@ -77,14 +89,12 @@ async def list_schedules(
     stmt = select(Schedule).where(Schedule.user_id == user.id)
     if date:
         day = datetime.strptime(date, "%Y-%m-%d")
-        stmt = stmt.where(
-            and_(Schedule.start_time >= day, Schedule.start_time < day.replace(day=day.day + 1))
-        )
+        stmt = stmt.where(and_(Schedule.start_time >= day, Schedule.start_time < day.replace(day=day.day + 1)))
     result = await session.execute(stmt.order_by(Schedule.start_time))
     items = result.scalars().all()
     return {"code": 0, "data": [
         {"id": s.id, "title": s.title, "start": s.start_time.isoformat(), "end": s.end_time.isoformat(),
-         "category": s.category, "is_completed": s.is_completed}
+         "category": s.category, "is_completed": s.is_completed, "is_paused": s.is_paused}
         for s in items
     ]}
 
@@ -104,19 +114,152 @@ async def complete_schedule(
     schedule.is_completed = True
     schedule.completion_quality = data.quality
 
-    # 行为采集（含结果反馈）
     collector = BehaviorCollector(session)
     await collector.log_schedule(
         user_id=user.id, schedule_id=schedule_id,
         completed=True, duration_min=data.duration_min,
-        self_rating=int(data.quality * 5) if data.quality else None,
+        self_rating=int(data.quality) if data.quality > 1 else int(data.quality * 5),
         is_delayed=data.is_delayed,
     )
     await session.commit()
     return {"code": 0, "message": "已完成，行为已记录"}
 
 
-# ---- 碎片任务 ----
+# ==================== 冲突检测 ====================
+
+@router.get("/conflicts")
+async def detect_conflicts(
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+):
+    """检测日程时间重叠冲突"""
+    planner = SchedulePlanner(session, user.id)
+    conflicts = await planner.detect_conflicts()
+    return {"code": 0, "data": conflicts}
+
+
+@router.get("/fragment-slots")
+async def fragment_slots(
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+):
+    """获取碎片时间挪位方案"""
+    planner = SchedulePlanner(session, user.id)
+    slots = await planner.suggest_fragment_slots()
+    return {"code": 0, "data": slots}
+
+
+# ==================== 突发场景 ====================
+
+@router.post("/emergency/pause")
+async def emergency_pause(
+    reason: str = "general",
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+):
+    """一键暂停所有未来日程"""
+    planner = SchedulePlanner(session, user.id)
+    result = await planner.emergency_pause(reason)
+    return {"code": 0, "data": result}
+
+
+@router.post("/emergency/postpone")
+async def emergency_postpone(
+    delay_hours: int = 2,
+    reason: str = "general",
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+):
+    """一键顺延所有未来日程"""
+    planner = SchedulePlanner(session, user.id)
+    result = await planner.emergency_postpone(delay_hours, reason)
+    return {"code": 0, "data": result}
+
+
+@router.post("/emergency/resume")
+async def emergency_resume(
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+):
+    """恢复所有暂停的日程"""
+    planner = SchedulePlanner(session, user.id)
+    result = await planner.resume_all()
+    return {"code": 0, "data": result}
+
+
+# ==================== 周期性例外 ====================
+
+@router.post("/exceptions")
+async def add_exception(
+    data: RecurringExceptionCreate,
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+):
+    """添加周期性例外日程"""
+    planner = SchedulePlanner(session, user.id)
+    exc = await planner.add_recurring_exception(
+        title=data.title, description=data.description, rule_expr=data.rule_expr,
+        effective_from=data.effective_from, effective_until=data.effective_until,
+    )
+    await session.commit()
+    return {"code": 0, "data": {"id": exc.id}}
+
+
+@router.get("/exceptions")
+async def list_exceptions(
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+):
+    """获取周期性例外列表"""
+    result = await session.execute(
+        select(RecurringException).where(
+            and_(RecurringException.user_id == user.id, RecurringException.is_active == True)
+        )
+    )
+    items = result.scalars().all()
+    return {"code": 0, "data": [
+        {"id": e.id, "title": e.title, "description": e.description, "rule_expr": e.rule_expr,
+         "effective_from": e.effective_from.isoformat(), "effective_until": e.effective_until.isoformat() if e.effective_until else None}
+        for e in items
+    ]}
+
+
+@router.get("/exceptions/apply")
+async def apply_exceptions(
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+):
+    """应用周期性例外到今日"""
+    planner = SchedulePlanner(session, user.id)
+    applied = await planner.apply_recurring_exceptions()
+    return {"code": 0, "data": applied}
+
+
+# ==================== 熬夜检测 ====================
+
+@router.get("/late-night")
+async def detect_late_night(
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+):
+    """检测熬夜情况"""
+    planner = SchedulePlanner(session, user.id)
+    result = await planner.detect_late_night()
+    return {"code": 0, "data": result}
+
+
+@router.get("/adjusted-load")
+async def adjusted_load(
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+):
+    """获取调整后的任务负荷"""
+    planner = SchedulePlanner(session, user.id)
+    result = await planner.get_adjusted_task_load()
+    return {"code": 0, "data": result}
+
+
+# ==================== 碎片任务 ====================
 
 class ItemCreate(BaseModel):
     title: str
@@ -132,11 +275,8 @@ async def create_item(
     user: User = Depends(get_current_user),
 ):
     item = ScheduleItem(
-        user_id=user.id,
-        title=data.title,
-        estimated_minutes=data.estimated_minutes,
-        priority=data.priority,
-        slot_type=data.slot_type,
+        user_id=user.id, title=data.title, estimated_minutes=data.estimated_minutes,
+        priority=data.priority, slot_type=data.slot_type,
     )
     session.add(item)
     await session.commit()

@@ -63,6 +63,32 @@ async def get_me(user: User = Depends(get_current_user)):
     return {"code": 0, "data": {
         "id": user.id, "username": user.username, "user_type": user.user_type,
         "wake_hour": user.wake_hour, "sleep_hour": user.sleep_hour,
+        "commute_minutes": user.commute_minutes,
+    }}
+
+
+class UserProfileUpdate(BaseModel):
+    wake_hour: int | None = None
+    sleep_hour: int | None = None
+    commute_minutes: int | None = None
+
+
+@router.put("/profile")
+async def update_profile(
+    data: UserProfileUpdate,
+    user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_db),
+):
+    """更新用户基础信息（起床/睡觉/通勤）"""
+    if data.wake_hour is not None:
+        user.wake_hour = max(0, min(23, data.wake_hour))
+    if data.sleep_hour is not None:
+        user.sleep_hour = max(0, min(23, data.sleep_hour))
+    if data.commute_minutes is not None:
+        user.commute_minutes = max(0, min(180, data.commute_minutes))
+    await session.commit()
+    return {"code": 0, "data": {
+        "wake_hour": user.wake_hour, "sleep_hour": user.sleep_hour, "commute_minutes": user.commute_minutes,
     }}
 
 

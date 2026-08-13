@@ -1,7 +1,7 @@
 """日程与时间规划模型"""
 from datetime import datetime
 
-from sqlalchemy import String, Integer, DateTime, ForeignKey, Text, Float, Boolean
+from sqlalchemy import String, Integer, DateTime, ForeignKey, Text, Float, Boolean, JSON
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db import Base
@@ -56,7 +56,7 @@ class RecurringException(Base):
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     # 周期规则（JSON）：{"days_of_week": [1,2,3,4,5], "start_time": "19:00", "end_time": "21:00", "action": "add/pause/skip"}
-    rule_expr: Mapped[dict] = mapped_column()
+    rule_expr: Mapped[dict] = mapped_column(JSON)
 
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     effective_from: Mapped[datetime] = mapped_column(DateTime)
